@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@android:anim/decelerate_interpolator">
+
+    <!-- از بالا وارد می‌شود + محو شدن -->
+    <translate
+        android:duration="400"
+        android:fromYDelta="-25%p"
+        android:toYDelta="0"
+        android:startOffset="50" />
+
+    <alpha
+        android:duration="350"
+        android:fromAlpha="0.0"
+        android:toAlpha="1.0"
+        android:startOffset="100" />
+
+    <!-- مقیاس کوچک برای افکت "پرش" -->
+    <scale
+        android:duration="400"
+        android:fromXScale="0.95"
+        android:fromYScale="0.95"
+        android:toXScale="1.0"
+        android:toYScale="1.0"
+        android:pivotX="50%"
+        android:pivotY="50%"
+        android:startOffset="50" />
+</set>
+
+<?xml version="1.0" encoding="utf-8"?>
+<layoutAnimation xmlns:android="http://schemas.android.com/apk/res/android"
+    android:animation="@anim/item_fade_slide_in"
+    android:animationOrder="normal"
+    android:delay="30%" />
+
+
+<?xml version="1.0" encoding="utf-8"?>
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@android:anim/accelerate_interpolator">
+
+    <alpha
+        android:duration="250"
+        android:fromAlpha="1.0"
+        android:toAlpha="0.0" />
+
+    <translate
+        android:duration="300"
+        android:fromYDelta="0"
+        android:toYDelta="100%p" />
+
+    <scale
+        android:duration="250"
+        android:fromXScale="1.0"
+        android:fromYScale="1.0"
+        android:toXScale="0.9"
+        android:toYScale="0.9"
+        android:pivotX="50%"
+        android:pivotY="50%" />
+</set>
+
+<?xml version="1.0" encoding="utf-8"?>
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@android:anim/decelerate_interpolator">
+
+    <translate
+        android:duration="350"
+        android:fromYDelta="100%"
+        android:toYDelta="0" />
+
+    <alpha
+        android:duration="300"
+        android:fromAlpha="0.7"
+        android:toAlpha="1.0"
+        android:startOffset="50" />
+</set>
+
+<?xml version="1.0" encoding="utf-8"?>
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@android:anim/accelerate_interpolator">
+
+    <translate
+        android:duration="300"
+        android:fromYDelta="0"
+        android:toYDelta="100%" />
+
+    <alpha
+        android:duration="250"
+        android:fromAlpha="1.0"
+        android:toAlpha="0.0" />
+</set>
+
+<?xml version="1.0" encoding="utf-8"?>
+<alpha xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="400"
+    android:fromAlpha="0.0"
+    android:toAlpha="1.0"
+    android:interpolator="@android:anim/linear_interpolator" />
+
+
+<?xml version="1.0" encoding="utf-8"?>
+<alpha xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="300"
+    android:fromAlpha="1.0"
+    android:toAlpha="0.0"
+    android:interpolator="@android:anim/linear_interpolator" />
+
+
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="ir.cafebazaar.bazaarpay">
+
+    <!-- دسترسی‌های ضروری -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application
+        android:allowBackup="false"
+        android:usesCleartextTraffic="false"
+        tools:targetApi="28">
+
+        <!-- اکتیویتی اصلی پرداخت -->
+        <activity
+            android:name=".main.BazaarPayActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.BazaarPay.Transparent"
+            android:windowSoftInputMode="adjustResize|stateHidden"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <!-- دیپ لینک افزایش اعتبار -->
+                <data
+                    android:scheme="https"
+                    android:host="${applicationId}.bazaar.ir"
+                    android:pathPrefix="/increase_balance" />
+
+                <!-- دیپ لینک فعال‌سازی دایرکت دبیت -->
+                <data
+                    android:scheme="https"
+                    android:host="${applicationId}.bazaar.ir"
+                    android:pathPrefix="/direct_debit_activation" />
+
+                <!-- دیپ لینک عمومی -->
+                <data android:scheme="bazaar"
+                      android:host="${applicationId}" />
+            </intent-filter>
+
+            <!-- پشتیبانی از App Links (Android 12+) -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+            </intent-filter>
+        </activity>
+
+        <!-- سرویس برای sync آنالیتیکس در پس‌زمینه (اختیاری) -->
+        <service
+            android:name=".services.AnalyticsSyncService"
+            android:enabled="true"
+            android:exported="false" />
+
+    </application>
+</manifest>
+
+<!-- در styles.xml -->
+<style name="ActivityTransition">
+    <item name="android:activityOpenEnterAnimation">@anim/screen_slide_up_enter</item>
+    <item name="android:activityOpenExitAnimation">@anim/screen_fade_out</item>
+    <item name="android:activityCloseEnterAnimation">@anim/screen_fade_in</item>
+    <item name="android:activityCloseExitAnimation">@anim/screen_slide_down_exit</item>
+</style>
+
+<androidx.recyclerview.widget.RecyclerView
+    android:layoutAnimation="@anim/layout_animation_fade_slide"
+    ... />
+
+
+recyclerView.adapter?.notifyItemRemoved(position)
+recyclerView.scheduleLayoutAnimation() // دوباره اجرا
+
+
