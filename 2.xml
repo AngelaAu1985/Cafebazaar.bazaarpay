@@ -1,0 +1,11 @@
+<resources>
+    <declare-styleable name="LocalAwareTextView">
+        <attr name="gravity" format="enum">
+            <enum name="default" value="0" />
+            <enum name="opposite" value="1" />
+        </attr>
+    </declare-styleable>
+    <declare-styleable name="MerchantInfoView">
+        <attr name="placeholderIcon" format="reference" />
+    </declare-styleable>
+</resources>
