@@ -1,0 +1,17 @@
+<resources>
+    <declare-styleable name="GeneralErrorView">
+        <attr name="errorMessage" format="string" />
+        <attr name="showRetryButton" format="boolean" />
+    </declare-styleable>
+    <declare-styleable name="NetworkErrorView">
+        <attr name="errorMessage" format="string" />
+        <attr name="showRetryButton" format="boolean" />
+    </declare-styleable>
+    <declare-styleable name="NotFoundErrorView">
+        <attr name="errorMessage" format="string" />
+    </declare-styleable>
+    <declare-styleable name="NotLoginErrorView">
+        <attr name="titleResId" format="reference" />
+        <attr name="showLoginButton" format="boolean" />
+    </declare-styleable>
+</resources>
