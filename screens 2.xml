@@ -1,0 +1,12 @@
+<resources>
+    <color name="bazaarpay_app_brand_primary">#6200EE</color>
+    <color name="bazaarpay_grey_60">#99000000</color>
+    <color name="bazaarpay_error_primary">#D32F2F</color>
+    <string name="bazaarpay_direct_pay_title">Contract with %s</string>
+    <string name="bazaarpay_merchant_message">Message from %s</string>
+    <string name="bazaarpay_resend_after">Resend after %s</string>
+    <string name="bazaarpay_privacy_and_terms_login">Privacy and Terms</string>
+    <string name="bazaarpay_wrong_phone_number">Invalid phone number</string>
+    <string name="bazaarpay_error_general">An error occurred</string>
+</resources>
+
