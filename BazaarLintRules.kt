@@ -19,22 +19,11 @@ package com.farsitel.bazaar.lintrules
 import com.android.tools.lint.client.api.IssueRegistry
 import com.android.tools.lint.client.api.Vendor
 import com.android.tools.lint.detector.api.*
-import com.intellij.psi.PsiClass
-import com.intellij.psi.PsiModifier
 import org.jetbrains.uast.*
 import org.jetbrains.uast.util.isKotlin
 
 /**
  * رجیستری و دیتکتور یکپارچه برای قانون "عدم override متد plugins() در کلاس‌های غیر-final"
- *
- * ویژگی‌های خلاقانه:
- *  - یک فایل، یکپارچه، بدون وابستگی خارجی
- *  - پشتیبانی هوشمند از Kotlin و Java
- *  - LintFix هوشمند: افزودن `final` یا `open` در کلاس پایه
- *  - تشخیص خودکار پکیج‌های `ui`, `core`, `feature`
- *  - پیام خطا چندزبانه (فارسی + انگلیسی)
- *  - قابلیت تنظیم از طریق annotation: @AllowPluginsOverride
- *  - تست‌پذیری بالا با UAST
  */
 class BazaarLintRules : IssueRegistry() {
     override val issues = listOf(PluginsOverrideInNonFinalClassDetector.ISSUE)
@@ -63,7 +52,7 @@ object PluginsOverrideInNonFinalClassDetector : Detector(), UastScanner {
         "com.farsitel.bazaar.feature"
     )
 
-    private val ALLOW_ANNOTATION = "com.farsitel.bazaar.lintrules.annotation.AllowPluginsOverride"
+    private const val ALLOW_ANNOTATION = "com.farsitel.bazaar.lintrules.annotation.AllowPluginsOverride"
 
     @JvmField
     val ISSUE = Issue.create(
@@ -98,11 +87,11 @@ object PluginsOverrideInNonFinalClassDetector : Detector(), UastScanner {
             if (hasAllowAnnotation(node)) return
             if (!inheritsFromBaseClass(node)) return
 
-            node.findMethodsByName("plugins", false)
-                .filter { context.evaluator.isOverride(it) }
+            node.methods
+                .filter { it.name == "plugins" && context.evaluator.isOverride(it) }
                 .forEach { method ->
                     val fix = buildSmartFix(node, method)
-                    val message = buildSmartMessage(node, method)
+                    val message = buildSmartMessage(node)
 
                     context.report(
                         issue = ISSUE,
@@ -115,10 +104,10 @@ object PluginsOverrideInNonFinalClassDetector : Detector(), UastScanner {
         }
 
         private fun inheritsFromBaseClass(uClass: UClass): Boolean {
-            val psiClass = uClass.javaPsi as? PsiClass ?: return false
+            val psiClass = uClass.javaPsi ?: return false
             return PACKAGES.any { pkg ->
                 BASE_CLASSES.any { base ->
-                    context.evaluator.inheritsFrom(psiClass, "$pkg.$base", false)
+                    context.evaluator.inheritsFrom(psiClass, "$pkg.$base", true)
                 }
             }
         }
@@ -127,10 +116,9 @@ object PluginsOverrideInNonFinalClassDetector : Detector(), UastScanner {
             return uClass.findAnnotation(ALLOW_ANNOTATION) != null
         }
 
-        private fun buildSmartMessage(uClass: UClass, method: UMethod): String {
+        private fun buildSmartMessage(uClass: UClass): String {
             val className = uClass.name ?: "کلاس"
-            val lang = if (uClass.sourcePsi?.language?.isKindOf(org.jetbrains.kotlin.psi.KtLanguage.INSTANCE) == true) "Kotlin" else "Java"
-            val suggestion = if (lang == "Kotlin") "کلاس را `final` کنید یا از `@AllowPluginsOverride` استفاده کنید." else "کلاس را `final` کنید."
+            val suggestion = "کلاس را `final` کنید یا از `@AllowPluginsOverride` استفاده کنید."
 
             return """
                 `$className` متد `plugins()` را override کرده اما `final` نیست.
@@ -143,81 +131,94 @@ object PluginsOverrideInNonFinalClassDetector : Detector(), UastScanner {
         private fun buildSmartFix(uClass: UClass, method: UMethod): LintFix? {
             val fixes = mutableListOf<LintFix>()
 
-            // 1. افزودن `final` (Java) یا `final class` (Kotlin)
+            // 1. افزودن `final` به کلاس
             if (!uClass.isFinal) {
-                val modifierList = uClass.uastModifierList ?: return null
-                val sourcePsi = modifierList.sourcePsi ?: return null
+                val sourcePsi = uClass.sourcePsi ?: return null
+                val className = uClass.name ?: return null
 
-                fixes += if (isKotlin(uClass)) {
-                    fix()
+                if (isKotlin(uClass)) {
+                    val classKeyword = if (uClass.hasModifier(UastModifier.OPEN)) "open class" else "class"
+                    fixes += fix()
                         .name("کلاس را final کنید")
                         .replace()
-                        .pattern("(class|open class)\\s+${uClass.name}")
-                        .with("final class ${uClass.name}")
+                        .pattern("""\b$classKeyword\s+$className\b""")
+                        .with("final class $className")
                         .range(context.getLocation(sourcePsi))
+                        .autoFix()
                         .build()
                 } else {
-                    fix()
-                        .name("کلاس را final کنید")
-                        .addModifier(uClass, PsiModifier.FINAL)
-                        .build()
+                    val modifierList = uClass.javaPsi?.modifierList
+                    if (modifierList != null) {
+                        val currentText = modifierList.text ?: ""
+                        fixes += fix()
+                            .name("کلاس را final کنید")
+                            .replace()
+                            .range(context.getLocation(modifierList))
+                            .text(currentText)
+                            .with("final $currentText".trim())
+                            .autoFix()
+                            .build()
+                    }
                 }
             }
 
-            // 2. حذف `override` (اگر متد در کلاس پایه `open` نیست)
-            if (method.uastModifierList?.hasModifier(UastModifier.OVERRIDE) == true) {
+            // 2. حذف کلمه `override` (فقط در Kotlin)
+            if (isKotlin(uClass) && method.hasModifier(UastModifier.OVERRIDE)) {
+                val overrideToken = method.uastModifierList
+                    ?.modifierNodes
+                    ?.find { it.text == "override" }
+                    ?: return@forEach
+
                 fixes += fix()
                     .name("حذف override")
                     .replace()
-                     .text("override")
+                    .range(context.getLocation(overrideToken))
+                    .text("override")
                     .with("")
                     .autoFix()
                     .build()
             }
 
-            // 3. پیشنهاد افزودن @AllowPluginsOverride
-            fixes += fix()
-                .name("اجازه override با annotation")
-                .addAnnotation(uClass, ALLOW_ANNOTATION)
-                .build()
+            // 3. افزودن @AllowPluginsOverride
+            fixes += createAddAnnotationFix(uClass)
 
-            return fixes.takeIf { it.isNotEmpty() }?.let { fix().composite(*it.toTypedArray()) }
+            return if (fixes.isNotEmpty()) fix().composite(*fixes.toTypedArray()) else null
         }
 
-        private fun LintFix.Builder.addModifier(uClass: UClass, modifier: String): LintFix.Builder {
-            val modifierList = uClass.javaPsi?.modifierList ?: return this
-            return replace()
-                .range(context.getLocation(modifierList))
-                .text(modifierList.text ?: "")
-                .with("$modifier ${modifierList.text ?: ""}")
-                .autoFix()
-        }
+        private fun createAddAnnotationFix(uClass: UClass): LintFix {
+            val sourcePsi = uClass.sourcePsi ?: return fix().build()
+            val file = context.psiFile ?: return fix().build()
+            val packageName = file.packageName
+            val importExists = file.findImportByName(ALLOW_ANNOTATION) != null
+            val needImport = !importExists && packageName?.contains("com.farsitel.bazaar") != true
 
-        private fun LintFix.Builder.addAnnotation(uClass: UClass, annotation: String): LintFix.Builder {
-            val sourcePsi = uClass.sourcePsi ?: return this
-            val pkg = context.psiFile?.packageName ?: ""
-            val importStmt = if (pkg.contains("com.farsitel.bazaar")) "" else "import $annotation\n"
-            return replace()
+            val importFix = if (needImport) {
+                fix()
+                    .name("افزودن import")
+                    .replace()
+                    .range(context.getLocation(file))
+                    .text("")
+                    .with("import $ALLOW_ANNOTATION\n\n")
+                    .autoFix()
+                    .build()
+            } else null
+
+            val annotationFix = fix()
+                .name("افزودن @AllowPluginsOverride")
+                .replace()
                 .range(context.getLocation(sourcePsi))
-                .text(uClass.text.split("\n").firstOrNull() ?: "")
-                .with("@$annotation\n${uClass.text.split("\n").firstOrNull()}")
+                .text(sourcePsi.text.lines().firstOrNull { it.trim().startsWith("class") || it.trim().startsWith("@") } ?: "")
+                .with("@\( ALLOW_ANNOTATION\n \){sourcePsi.text.lines().first()}")
                 .autoFix()
                 .build()
+
+            return if (importFix != null) {
+                fix().composite(importFix, annotationFix)
+            } else {
+                annotationFix
+            }
         }
     }
-}
-
-package com.farsitel.bazaar.lintrules.annotation
-
-/**
- * اجازه override متد plugins() در کلاس‌های غیر-final
- */
-@Target(AnnotationTarget.CLASS)
-@Retention(AnnotationRetention.SOURCE)
-annotation class AllowPluginsOverride
-
-dependencies {
-    lintChecks project(":lint-rules")
 }
 
 class PluginsOverrideTest : AbstractLintTest() {
@@ -228,8 +229,12 @@ class PluginsOverrideTest : AbstractLintTest() {
     """.trimIndent())
 
     private val badCase = kotlin("""
+        package com.farsitel.bazaar.feature.payment
+        
+        import com.farsitel.bazaar.ui.BaseFragment
+        
         class MyFragment : BaseFragment() {
-            override fun plugins() = listOf(...)
+            override fun plugins() = listOf(MyPlugin())
         }
     """.trimIndent())
 
@@ -240,11 +245,7 @@ class PluginsOverrideTest : AbstractLintTest() {
             .issues(PluginsOverrideInNonFinalClassDetector.ISSUE)
             .run()
             .expectErrorCount(1)
+            .expectContains("MyFragment")
+            .expectContains("final")
     }
-}
-
-MyFragment.kt:25: Error: `MyFragment` متد `plugins()` را override کرده اما `final` نیست.
-کلاس را `final` کنید یا از `@AllowPluginsOverride` استفاده کنید.
-    override fun plugins(): List<Plugin> = ...
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+} 
