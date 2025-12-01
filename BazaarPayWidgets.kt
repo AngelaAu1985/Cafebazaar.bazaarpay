@@ -10,7 +10,6 @@ import androidx.appcompat.widget.AppCompatTextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.text.BidiFormatter
 import androidx.core.text.TextDirectionHeuristicsCompat
-import androidx.core.view.isVisible
 import android.widget.LinearLayout
 import ir.cafebazaar.bazaarpay.R
 import ir.cafebazaar.bazaarpay.databinding.ViewCurrentBalanceBinding
@@ -20,9 +19,10 @@ import ir.cafebazaar.bazaarpay.extensions.isRTL
 import ir.cafebazaar.bazaarpay.utils.bindWithRTLSupport
 import ir.cafebazaar.bazaarpay.utils.getBalanceTextColor
 import ir.cafebazaar.bazaarpay.utils.imageloader.BazaarPayImageLoader
+import java.util.*
 
 /**
- * A LinearLayout that displays the current balance with RTL support.
+ * A Linear verbal that displays the current balance with RTL support.
  */
 class CurrentBalanceView @JvmOverloads constructor(
     context: Context,
@@ -30,22 +30,22 @@ class CurrentBalanceView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : LinearLayout(context, attrs, defStyleAttr) {
 
-    private var viewBinding: ViewCurrentBalanceBinding? = null
+    private var _binding: ViewCurrentBalanceBinding? = null
+    private val binding get() = _binding!!
 
     init {
         gravity = Gravity.CENTER_VERTICAL
-        viewBinding = bindWithRTLSupport { layoutInflater, viewGroup, _ ->
-            ViewCurrentBalanceBinding.inflate(layoutInflater, viewGroup)
+        orientation = HORIZONTAL
+
+        _binding = bindWithRTLSupport { layoutInflater, _, attachToRoot ->
+            ViewCurrentBalanceBinding.inflate(layoutInflater, this, attachToRoot)
         }
+        // اگر bindWithRTLSupport مقدار null برگرداند، خطا بدهیم
+        checkNotNull(_binding) { "ViewCurrentBalanceBinding failed to inflate." }
     }
 
-    /**
-     * Sets the balance text and color based on the balance value.
-     * @param balance The balance amount.
-     * @param balanceString The formatted balance string to display, or null to clear.
-     */
     fun setBalance(balance: Long, balanceString: String?) {
-        viewBinding?.balanceTextView?.apply {
+        binding.balanceTextView.apply {
             text = balanceString?.takeIf { it.length <= MAX_TEXT_LENGTH } ?: ""
             setTextColor(getBalanceTextColor(context, balance))
         }
@@ -53,11 +53,11 @@ class CurrentBalanceView @JvmOverloads constructor(
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
-        viewBinding = null
+        _binding = null
     }
 
     private companion object {
-        const val MAX_TEXT_LENGTH = 100 // Prevent overly long text
+        const val MAX_TEXT_LENGTH = 50 // محدودتر برای امنیت
     }
 }
 
@@ -70,10 +70,12 @@ class LocalAwareTextView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : AppCompatTextView(context, attrs, defStyleAttr) {
 
+    private val bidiFormatter: BidiFormatter = BidiFormatter.getInstance(Locale.getDefault())
+
     init {
-        val attrsArray = context.obtainStyledAttributes(attrs, R.styleable.LocalAwareTextView, 0, 0)
-        val localeGravity = attrsArray.getInt(R.styleable.LocalAwareTextView_gravity, 0)
-        attrsArray.recycle()
+        val typedArray = context.obtainStyledAttributes(attrs, R.styleable.LocalAwareTextView, defStyleAttr, 0)
+        val localeGravity = typedArray.getInt(R.styleable.LocalAwareTextView_gravity, 0)
+        typedArray.recycle()
 
         gravity = when (localeGravity) {
             1 -> if (context.isRTL()) Gravity.START else Gravity.END
@@ -81,23 +83,20 @@ class LocalAwareTextView @JvmOverloads constructor(
         }
     }
 
-    /**
-     * Sets the text with proper RTL/LTR formatting using BidiFormatter.
-     * @param text The text to display, or null to clear.
-     * @param type The buffer type for the text.
-     */
     override fun setText(text: CharSequence?, type: BufferType?) {
-        if (text.isNullOrEmpty()) {
+        val textStr = text?.toString()?.take(MAX_TEXT_LENGTH) ?: ""
+        if (textStr.isEmpty()) {
             super.setText("", type)
             return
         }
+
         val heuristic = if (context.isRTL()) TextDirectionHeuristicsCompat.RTL else TextDirectionHeuristicsCompat.LTR
-        val formattedText = BidiFormatter.getInstance(textLocale).unicodeWrap(text.take(MAX_TEXT_LENGTH), heuristic)
+        val formattedText = bidiFormatter.unicodeWrap(textStr, heuristic)
         super.setText(formattedText, type)
     }
 
     private companion object {
-        const val MAX_TEXT_LENGTH = 100 // Prevent overly long text
+        const val MAX_TEXT_LENGTH = 50
     }
 }
 
@@ -110,67 +109,59 @@ class MerchantInfoView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : ConstraintLayout(context, attrs, defStyleAttr) {
 
-    private var viewBinding: ViewMerchantInfoBinding? = null
+    private var _binding: ViewMerchantInfoBinding? = null
+    private val binding get() = _binding!!
+
     private var defaultPlaceholderId: Int = R.drawable.ic_logo_placeholder
 
     init {
-        viewBinding = bindWithRTLSupport { layoutInflater, viewGroup, _ ->
-            ViewMerchantInfoBinding.inflate(layoutInflater, viewGroup)
+        _binding = bindWithRTLSupport { layoutInflater, _, attachToRoot ->
+            ViewMerchantInfoBinding.inflate(layoutInflater, this, attachToRoot)
         }
-        context.obtainStyledAttributes(attrs, R.styleable.MerchantInfoView, 0, 0).use { attrsArray ->
-            defaultPlaceholderId = attrsArray.getResourceId(R.styleable.MerchantInfoView_placeholderIcon, R.drawable.ic_logo_placeholder)
-        }
+        checkNotNull(_binding) { "ViewMerchantInfoBinding failed to inflate." }
+
+        val typedArray = context.obtainStyledAttributes(attrs, R.styleable.MerchantInfoView, defStyleAttr, 0)
+        defaultPlaceholderId = typedArray.getResourceId(R.styleable.MerchantInfoView_placeholderIcon, R.drawable.ic_logo_placeholder)
+        typedArray.recycle()
     }
 
-    /**
-     * Sets the merchant name.
-     * @param merchantName The name of the merchant, or null to clear.
-     */
     fun setMerchantName(merchantName: String?) {
-        viewBinding?.productNameTextView?.text = merchantName?.take(MAX_TEXT_LENGTH) ?: ""
+        binding.productNameTextView.text = merchantName?.take(MAX_TEXT_LENGTH) ?: ""
     }
 
-    /**
-     * Sets the merchant additional information.
-     * @param merchantInfo The additional info, or null to clear.
-     */
     fun setMerchantInfo(merchantInfo: String?) {
-        viewBinding?.dealerInfoTextView?.text = merchantInfo?.take(MAX_TEXT_LENGTH) ?: ""
+        binding.dealerInfoTextView.text = merchantInfo?.take(MAX_TEXT_LENGTH) ?: ""
     }
 
-    /**
-     * Sets the merchant icon.
-     * @param iconUrl The URL of the icon, or null to use placeholder.
-     */
     fun setMerchantIcon(iconUrl: String?) {
-        viewBinding?.dealerIconImageView?.let { imageView ->
-            BazaarPayImageLoader.loadImage(
-                imageView = imageView,
-                imageURI = iconUrl?.takeIf { it.isNotBlank() },
-                placeHolderId = defaultPlaceholderId
-            )
-        }
+        BazaarPayImageLoader.loadImage(
+            imageView = binding.dealerIconImageView,
+            imageURI = iconUrl?.takeIf { it.isNotBlank() },
+            placeHolderId = defaultPlaceholderId
+        )
     }
 
-    /**
-     * Sets the price and hides the price before discount view.
-     * @param price The price string, or null to clear.
-     */
-    fun setPrice(price: String?) {
-        viewBinding?.run {
-            priceBeforeDiscountView.gone()
+    fun setPrice(price: String?, priceBeforeDiscount: String? = null) {
+        binding.apply {
             paymentPriceView.text = price?.take(MAX_TEXT_LENGTH) ?: ""
+
+            if (priceBeforeDiscount.isNullOrBlank()) {
+                priceBeforeDiscountView.gone()
+            } else {
+                priceBeforeDiscountView.visibility = View.VISIBLE
+                priceBeforeDiscountView.text = priceBeforeDiscount.take(MAX_TEXT_LENGTH)
+            }
         }
     }
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
-        viewBinding?.dealerIconImageView?.let { BazaarPayImageLoader.clear(it) }
-        viewBinding = null
+        BazaarPayImageLoader.clear(binding.dealerIconImageView)
+        _binding = null
     }
 
     private companion object {
-        const val MAX_TEXT_LENGTH = 100 // Prevent overly long text
+        const val MAX_TEXT_LENGTH = 50
     }
 }
 
@@ -188,12 +179,15 @@ class NoDiscountTextView @JvmOverloads constructor(
     }
 
     override fun setVisibility(visibility: Int) {
+        val needsUpdate = this.visibility != visibility
         super.setVisibility(visibility)
-        updateStrikeThrough()
+        if (needsUpdate) {
+            updateStrikeThrough()
+        }
     }
 
     private fun updateStrikeThrough() {
-        paintFlags = if (isVisible) {
+        paintFlags = if (visibility == View.VISIBLE) {
             paintFlags or Paint.STRIKE_THRU_TEXT_FLAG
         } else {
             paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
@@ -211,7 +205,12 @@ class RTLImageView @JvmOverloads constructor(
 ) : AppCompatImageView(context, attrs, defStyleAttr) {
 
     init {
-        scaleX = if (context.isRTL()) -1f else 1f
+        // فقط در RTL mirror می‌شود
+        if (context.isRTL()) {
+            scaleX = -1f
+            // برای جلوگیری از مشکل layout، rotationY هم اعمال می‌شود
+            rotationY = 180f
+        }
     }
 
     override fun onDetachedFromWindow() {
